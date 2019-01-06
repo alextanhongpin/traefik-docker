@@ -1,0 +1,35 @@
+defaultEntryPoints = ["http"]
+
+[entryPoints]
+	[entryPoints.http]
+		address = ":80"
+	# The default API endpoint.
+	[entryPoints.traefik]
+		address = ":8080"
+		[entryPoints.traefik.auth]
+			[entryPoints.traefik.auth.basic]
+				users = [
+					"test:$apr1$BQ62wtHi$/FG75gm/IFqHaza7c9zjk/"
+				]
+
+[backends]
+	[backends.circuitBreaker]
+		expression = "NetworkErrorRatio() > 0.5"
+
+# Enable api.
+[api]
+	entryPoint = "traefik" # Default
+	dashboard = true # Default
+	debug = false # Default
+
+logLevel = "INFO"
+
+[traefikLog]
+	filePath = "./logs/traefik.log"
+	format   = "json"
+
+[docker]
+	exposedByDefault = true
+	domain = "docker.localhost"
+	watch = true
+	constraints = ["tag==api"]

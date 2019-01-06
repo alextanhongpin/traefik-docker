@@ -1,0 +1,42 @@
+version: '3.7'
+
+services:
+        reverse-proxy:
+                image: traefik:1.7.6
+                command: --api --docker
+                ports:
+                        - 80:80 # The HTTP port.
+                        - 8080:8080 # The Web UI.
+                volumes:
+                        # The custom config file.
+                        - $PWD/.traefik/traefik.toml:/etc/traefik/traefik.toml
+                        # So that traefik can listen to the events.
+                        - /var/run/docker.sock:/var/run/docker.sock
+
+        whoami:
+                image: containous/whoami
+                labels:
+                        - traefik.frontend.rule=Host:whoami.docker.localhost
+                        # Add traefik tags to the Container to be used in constraints.
+                        - traefik.tags=dev
+                        # Overrides the container name in the backend.
+                        - traefik.backend=whoami_service
+                        - traefik.enable=true
+                        # Watch error ratio over 10 second sliding window for frontend.
+                        - traefik.backend.circuitbreaker.expression=NetworkErrorRatio() > 0.5
+                        # Watch latency at quantile in milliseconds.
+                        - traefik.backend.circuitbreaker.expression=LatencyAtQuantileMS(50.0) > 50
+                        # Ratio of response codes in ranges [500-600) and [0-600).
+                        - traefik.backend.circuitbreaker.expression=ResponseCodeRatio(500, 600, 0, 600) > 0.5
+                        - traefik.backend.healthcheck.path=/health
+                        - traefik.backend.healthcheck.interval=5s
+
+                        # Limit number of connections by ip.
+                        - traefik.backend.maxconn.amount=10
+                        - traefik.backend.maxconn.extractorfunc=client.ip
+
+                        # Rate-limit by ip address.
+                        - traefik.frontend.rateLimit.extractorFunc=client.ip
+                        - traefik.frontend.rateLimit.rateSet.throttle.period=1s
+                        - traefik.frontend.rateLimit.rateSet.throttle.burst=1
+                        - traefik.frontend.rateLimit.rateSet.throttle.average=1
